@@ -1,0 +1,76 @@
+--- 
+
+- name: Create configfile
+  template:
+    dest: /etc/pgbouncer/pgbouncer.ini
+    src: pgbouncer.ini.j2
+    owner: "{{ pgbouncer_os_user }}"
+    group: "{{ pgbouncer_os_group }}"
+    mode: 0666
+
+- name: Create DB objects
+  become_user: postgres
+  environment:
+    PGSERVICE: master
+
+  block:
+
+  - name: Create auth DB
+    community.postgresql.postgresql_db:
+      name: "{{ pgbouncer_auth_db }}"
+
+  - name: Create auth user
+    community.postgresql.postgresql_user:
+      name: "{{ pgbouncer_auth_user }}"
+      role_attr_flags: LOGIN
+
+  - name: Copy script create_function_lookup.sql
+    ansible.builtin.template:
+      src:   create_function_lookup.sql.j2
+      dest:  /tmp/create_function_lookup.sql
+      owner: postgres
+      group: postgres
+      mode: '0644'
+
+  - name: Run script
+    community.postgresql.postgresql_script:
+      login_db: "{{ pgbouncer_auth_db }}"
+      path: /tmp/create_function_lookup.sql
+
+  run_once: true
+
+- name: Manage HBA
+  block:
+
+  - name: Update pg_hba.conf add pgbouncer
+    community.postgresql.postgresql_pg_hba:
+      dest: "{{ pgbouncer_pgdata }}/pg_hba.conf"
+      contype: local
+      databases: "{{ pgbouncer_auth_db }}"
+      users: "{{ pgbouncer_auth_user }}"
+      method: peer
+      options: map=pgbouncer
+    notify:
+      - Reload postgres
+  
+  - name: Update pg_hba.conf to scram-sha-256
+    community.postgresql.postgresql_pg_hba:
+      dest: "{{ pgbouncer_pgdata }}/pg_hba.conf"
+      contype: local
+      databases: all
+      users: all
+      method: scram-sha-256
+    notify:
+      - Reload postgres
+  when: pgbouncer_manage_hba
+
+
+- name: Add ident line for pgbouncer to login as {{ pgbouncer_auth_user }} without password
+  ansible.builtin.lineinfile:
+    path:  "{{ pgbouncer_pgdata }}/pg_ident.conf"
+    line:  "pgbouncer {{ pgbouncer_os_user }} {{ pgbouncer_auth_user }}"
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  when: pgbouncer_manage_ident
+  notify: Reload postgres

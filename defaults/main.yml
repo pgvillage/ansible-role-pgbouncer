@@ -1,0 +1,25 @@
+---
+
+# default values for PgBouncer
+
+pgbouncer_manage_hba: true
+pgbouncer_manage_ident: true
+
+pgbouncer_os_user:  "pgbouncer"
+pgbouncer_os_group: "pgbouncer"
+pgbouncer_auth_user: "pgbouncer_auth_user"
+pgbouncer_pgdata: "/var/lib/postgresql/data"
+
+pgbouncer_auth_db: "pgbouncer_auth_db"
+pgbouncer_auth_type: scram-sha-256
+pgbouncer_pool_mode: transaction
+pgbouncer_server_cert_file: ""
+pgbouncer_server_key_file: ""
+pgbouncer_ca_file: ""
+pgbouncer_client_key_file: ""
+pgbouncer_client_cert_file: ""
+
+pgbouncer_pgport: 5432
+pgbouncer_max_client_conn: 100
+pgbouncer_default_pool_size: 20
+pgbouncer_min_pool_size: 0

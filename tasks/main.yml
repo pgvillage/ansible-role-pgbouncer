@@ -1,0 +1,14 @@
+---
+
+- name: Assertions
+  assert:
+    that:
+      - "pgbouncer_auth_db != 'pgbouncer'"
+
+- name: Install
+  include_tasks: install.yml
+- name: Configure
+  include_tasks: config.yml
+- name: Start
+  include_tasks: start.yml
+

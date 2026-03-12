@@ -1,0 +1,27 @@
+--- 
+
+- name: Install pgbouncer
+  dnf:
+    name: pgbouncer
+    state: present
+
+- name: Create pgbouncer configuration files
+  ansible.builtin.file:
+    dest: "{{ item.dest }}"
+    owner: "{{ pgbouncer_os_user }}"
+    group: "{{ pgbouncer_os_group }}"
+    state: "{{ item.state }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - dest: /var/log/pgbouncer
+      state: directory
+      mode: '0755'
+    - dest: /var/log/pgbouncer/pgbouncer.log
+      state: touch
+      mode: '0644'
+    - dest: /var/run/pgbouncer
+      state: directory
+      mode: '0755'
+    - dest: /home/pgbouncer/.bashrc.d
+      state: directory
+      mode: '0755'
