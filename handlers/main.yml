@@ -1,20 +1,20 @@
 ---
-# Restart pgbouncer service
-#   ansible.builtin.systemd:
 
-  - name: Reload pgbouncer
-    systemd_service:
-      name: pgbouncer
-      state: reloaded
-      enabled: true
-      daemon_reload: true
+- name: Reload pgbouncer
+  ansible.builtin.systemd_service:
+    name: pgbouncer
+    state: reloaded
+    enabled: true
+    daemon_reload: true
 
-  - name: Reload postgres
-    command: pkill -HUP postgres
+- name: Reload postgres
+  ansible.builtin.command: pkill -HUP postgres
+  register: handle_reload
+  changed_when: handle_reload.rc != 0
 
-  - name: Restart pgbouncer
-    systemd_service:
-      name: pgbouncer
-      enabled: true
-      state: restarted
-      daemon_reload: true
+- name: Restart pgbouncer
+  ansible.builtin.systemd_service:
+    name: pgbouncer
+    enabled: true
+    state: restarted
+    daemon_reload: true

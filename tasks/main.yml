@@ -1,14 +1,13 @@
 ---
 
 - name: Assertions
-  assert:
+  ansible.builtin.assert:
     that:
       - "pgbouncer_auth_db != 'pgbouncer'"
 
 - name: Install
-  include_tasks: install.yml
+  ansible.legacy.include_tasks: install.yml
 - name: Configure
-  include_tasks: config.yml
+  ansible.legacy.include_tasks: config.yml
 - name: Start
-  include_tasks: start.yml
-
+  ansible.legacy.include_tasks: start.yml
