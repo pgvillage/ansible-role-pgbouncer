@@ -8,6 +8,14 @@
     group: "{{ pgbouncer_os_group }}"
     mode: "0666"
 
+- name: Copy script create_function_lookup.sql
+  ansible.builtin.template:
+    src: create_function_lookup.sql.j2
+    dest: /tmp/create_function_lookup.sql
+    owner: postgres
+    group: postgres
+    mode: '0644'
+
 - name: Create DB objects
   become: true
   become_user: postgres
@@ -23,14 +31,6 @@
       community.postgresql.postgresql_user:
         name: "{{ pgbouncer_auth_user }}"
         role_attr_flags: LOGIN
-
-    - name: Copy script create_function_lookup.sql
-      ansible.builtin.template:
-        src: create_function_lookup.sql.j2
-        dest: /tmp/create_function_lookup.sql
-        owner: postgres
-        group: postgres
-        mode: '0644'
 
     - name: Run script
       community.postgresql.postgresql_script:
