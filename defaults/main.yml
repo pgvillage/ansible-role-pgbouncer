@@ -5,7 +5,7 @@
 pgbouncer_manage_hba: true
 pgbouncer_manage_ident: true
 
-pgbouncer_os_user:  "pgbouncer"
+pgbouncer_os_user: "pgbouncer"
 pgbouncer_os_group: "pgbouncer"
 pgbouncer_auth_user: "pgbouncer_auth_user"
 pgbouncer_pgdata: "/var/lib/postgresql/data"
