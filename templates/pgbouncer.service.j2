@@ -17,7 +17,7 @@ Environment=BOUNCERCONF=/etc/pgbouncer/pgbouncer.ini
 # This is normally controlled by the global default set by systemd
 # StandardOutput=syslog
 
-ExecStart=/usr/bin/pgbouncer ${BOUNCERCONF}
+ExecStart={{ pgbouncer_install_dir }}/pgbouncer ${BOUNCERCONF}
 ExecReload=/usr/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
 

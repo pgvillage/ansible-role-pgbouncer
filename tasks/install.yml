@@ -1,5 +1,16 @@
 ---
 
+- name: "Create {{ pgbouncer_os_group }}"
+  ansible.builtin.group:
+    name: "{{ pgbouncer_os_group }}"
+    system: "true"
+
+- name: "Create {{ pgbouncer_os_user }}"
+  ansible.builtin.user:
+    name: "{{ pgbouncer_os_user }}"
+    group: "{{ pgbouncer_os_group }}"
+    system: "true"
+
 - name: Install pgbouncer
   ansible.builtin.package:
     name: pgbouncer
