@@ -29,9 +29,8 @@
 - name: "Create DB objects for instance {{ pgbouncer_instance_name }}"
   become: true
   become_user: postgres
-  environment:
-    PGPORT: "{{ pgbouncer_instance.pgport }}"
-    PGHOST: /tmp
+  # every key in pgenv becomes a libpq environment variable, e.g. service -> PGSERVICE
+  environment: "{{ dict(pgbouncer_instance.pgenv.keys() | map('upper') | map('regex_replace', '^', 'PG') | zip(pgbouncer_instance.pgenv.values())) }}"
   run_once: true
   block:
     - name: Create auth DB

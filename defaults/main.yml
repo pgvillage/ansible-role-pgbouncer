@@ -41,8 +41,9 @@ pgbouncer_instance_defaults:
   pgdata: "/var/lib/postgresql/data"
   pghost: "/tmp"
   pgport: 5432
-  # pg_service.conf entry used to create the auth db / user / lookup function
-  pgservice: master
+  # pgenv settings are used to connect to postgres and create the auth db / user / lookup function
+  pgenv:
+    service: master
   # pgbouncer listener
   listen_addr: "*"
   port: 6432
