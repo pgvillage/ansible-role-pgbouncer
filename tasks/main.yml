@@ -3,11 +3,31 @@
 - name: Assertions
   ansible.builtin.assert:
     that:
-      - "pgbouncer_auth_db != 'pgbouncer'"
+      - "pgbouncer_instances | length > 0"
 
 - name: Install
   ansible.legacy.include_tasks: install.yml
-- name: Configure
-  ansible.legacy.include_tasks: config.yml
-- name: Start
-  ansible.legacy.include_tasks: start.yml
+
+- name: Configure (per instance)
+  ansible.builtin.include_tasks: configure.yml
+  loop: "{{ pgbouncer_instances | dict2items }}"
+  loop_control:
+    loop_var: instance
+
+- name: Create service file
+  ansible.builtin.template:
+    dest: /etc/systemd/system/pgbouncer@.service
+    src: pgbouncer@.service.j2
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Restart pgbouncer instances
+
+- name: Start pgbouncer
+  ansible.builtin.systemd_service:
+    name: "pgbouncer@{{ item.name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ pgbouncer_instances | dict2items }}"

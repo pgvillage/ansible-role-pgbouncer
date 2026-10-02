@@ -1,8 +1,12 @@
 ---
 
+vars:
+  instance_name: "{{ instance.name }}"
+  instance_values: "{{ pgbouncer_instance_defaults | combine(instance.value, recursive=True) }}"
+
 - name: Create configfile
   ansible.builtin.template:
-    dest: /etc/pgbouncer/pgbouncer.ini
+    dest: "/etc/pgbouncer/pgbouncer-{{ instance.name }}.ini"
     src: pgbouncer.ini.j2
     owner: "{{ pgbouncer_os_user }}"
     group: "{{ pgbouncer_os_group }}"
@@ -25,16 +29,16 @@
   block:
     - name: Create auth DB
       community.postgresql.postgresql_db:
-        name: "{{ pgbouncer_auth_db }}"
+        name: "{{ instance_values.auth_db }}"
 
     - name: Create auth user
       community.postgresql.postgresql_user:
-        name: "{{ pgbouncer_auth_user }}"
+        name: "{{ instance_values.auth_user }}"
         role_attr_flags: LOGIN
 
     - name: Run script
       community.postgresql.postgresql_script:
-        login_db: "{{ pgbouncer_auth_db }}"
+        login_db: "{{ instance_values.auth_db }}"
         path: /tmp/create_function_lookup.sql
 
 - name: Manage HBA
@@ -43,17 +47,17 @@
   block:
     - name: Update pg_hba.conf add pgbouncer
       community.postgresql.postgresql_pg_hba:
-        dest: "{{ pgbouncer_pgdata }}/pg_hba.conf"
+        dest: "{{ instance_values.pgdata }}/pg_hba.conf"
         contype: local
-        databases: "{{ pgbouncer_auth_db }}"
-        users: "{{ pgbouncer_auth_user }}"
+        databases: "{{ instance_values.auth_db }}"
+        users: "{{ instance_values.auth_user }}"
         method: peer
         options: map=pgbouncer
       notify:
         - Reload postgres
     - name: Update pg_hba.conf to scram-sha-256
       community.postgresql.postgresql_pg_hba:
-        dest: "{{ pgbouncer_pgdata }}/pg_hba.conf"
+        dest: "{{ instance_values.pgdata }}/pg_hba.conf"
         contype: local
         databases: all
         users: all
@@ -61,12 +65,12 @@
       notify:
         - Reload postgres
 
-- name: "Add ident line for pgbouncer to login without password as {{ pgbouncer_auth_user }}"
+- name: "Add ident line for pgbouncer to login without password as {{ instance_values.auth_user }}"
   ansible.builtin.lineinfile:
-    path: "{{ pgbouncer_pgdata }}/pg_ident.conf"
-    line: "pgbouncer {{ pgbouncer_os_user }} {{ pgbouncer_auth_user }}"
+    path: "{{ instance_values.pgdata }}/pg_ident.conf"
+    line: "pgbouncer {{ instance_values.os_user }} {{ instance.auth_user }}"
     owner: postgres
     group: postgres
     mode: '0644'
-  when: pgbouncer_manage_ident
+  when: instance_values.manage_ident
   notify: Reload postgres

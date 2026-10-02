@@ -11,7 +11,7 @@ User={{ pgbouncer_os_user }}
 Group={{ pgbouncer_os_group }}
 
 # Path to the init file
-Environment=BOUNCERCONF=/etc/pgbouncer/pgbouncer.ini
+Environment=BOUNCERCONF=/etc/pgbouncer/pgbouncer-%I.ini
 
 # Where to send early-startup messages from the server 
 # This is normally controlled by the global default set by systemd
