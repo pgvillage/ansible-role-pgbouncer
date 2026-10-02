@@ -30,7 +30,8 @@
   become: true
   become_user: postgres
   environment:
-    PGSERVICE: "{{ pgbouncer_instance.pgservice }}"
+    PGPORT: "{{ pgbouncer_instance.pgport }}"
+    PGHOST: /tmp
   run_once: true
   block:
     - name: Create auth DB
