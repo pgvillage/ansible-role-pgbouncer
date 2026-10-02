@@ -1,0 +1,84 @@
+---
+# Included from main.yml once per instance, with:
+#   pgbouncer_instance_name: name of the instance (key in pgbouncer_instances)
+#   pgbouncer_instance:      pgbouncer_instance_defaults combined with the instance values
+
+- name: "Assertions for instance {{ pgbouncer_instance_name }}"
+  ansible.builtin.assert:
+    that:
+      - "pgbouncer_instance.auth_db != 'pgbouncer'"
+
+- name: "Create configfile for instance {{ pgbouncer_instance_name }}"
+  ansible.builtin.template:
+    dest: "/etc/pgbouncer/pgbouncer-{{ pgbouncer_instance_name }}.ini"
+    src: pgbouncer.ini.j2
+    owner: "{{ pgbouncer_os_user }}"
+    group: "{{ pgbouncer_os_group }}"
+    mode: "0640"
+  notify:
+    - Reload pgbouncer instances
+
+- name: "Copy script create_function_lookup.sql for instance {{ pgbouncer_instance_name }}"
+  ansible.builtin.template:
+    src: create_function_lookup.sql.j2
+    dest: "/tmp/create_function_lookup-{{ pgbouncer_instance_name }}.sql"
+    owner: postgres
+    group: postgres
+    mode: '0644'
+
+- name: "Create DB objects for instance {{ pgbouncer_instance_name }}"
+  become: true
+  become_user: postgres
+  # every key in pgenv becomes a libpq environment variable, e.g. service -> PGSERVICE
+  environment: "{{ dict(pgbouncer_instance.pgenv.keys() | map('upper') | map('regex_replace', '^', 'PG') | zip(pgbouncer_instance.pgenv.values())) }}"
+  run_once: true
+  block:
+    - name: Create auth DB
+      community.postgresql.postgresql_db:
+        name: "{{ pgbouncer_instance.auth_db }}"
+        login_port: "{{ pgbouncer_instance.pgport }}"
+
+    - name: Create auth user
+      community.postgresql.postgresql_user:
+        name: "{{ pgbouncer_instance.auth_user }}"
+        role_attr_flags: LOGIN
+        login_port: "{{ pgbouncer_instance.pgport }}"
+
+    - name: Run script
+      community.postgresql.postgresql_script:
+        login_db: "{{ pgbouncer_instance.auth_db }}"
+        login_port: "{{ pgbouncer_instance.pgport }}"
+        path: "/tmp/create_function_lookup-{{ pgbouncer_instance_name }}.sql"
+
+- name: "Manage HBA for instance {{ pgbouncer_instance_name }}"
+  when: pgbouncer_instance.manage_hba
+  block:
+    - name: Update pg_hba.conf add pgbouncer
+      community.postgresql.postgresql_pg_hba:
+        dest: "{{ pgbouncer_instance.pgdata }}/pg_hba.conf"
+        contype: local
+        databases: "{{ pgbouncer_instance.auth_db }}"
+        users: "{{ pgbouncer_instance.auth_user }}"
+        method: peer
+        options: map=pgbouncer
+      notify:
+        - Reload postgres
+    - name: Update pg_hba.conf to scram-sha-256
+      community.postgresql.postgresql_pg_hba:
+        dest: "{{ pgbouncer_instance.pgdata }}/pg_hba.conf"
+        contype: local
+        databases: all
+        users: all
+        method: scram-sha-256
+      notify:
+        - Reload postgres
+
+- name: "Add ident line for pgbouncer to login without password as {{ pgbouncer_instance.auth_user }}"
+  ansible.builtin.lineinfile:
+    path: "{{ pgbouncer_instance.pgdata }}/pg_ident.conf"
+    line: "pgbouncer {{ pgbouncer_os_user }} {{ pgbouncer_instance.auth_user }}"
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  when: pgbouncer_instance.manage_ident
+  notify: Reload postgres

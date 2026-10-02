@@ -4,24 +4,54 @@
 
 pgbouncer_install_dir: /usr/bin
 
-pgbouncer_manage_hba: true
-pgbouncer_manage_ident: true
-
 pgbouncer_os_user: "pgbouncer"
 pgbouncer_os_group: "pgbouncer"
-pgbouncer_auth_user: "pgbouncer_auth_user"
-pgbouncer_pgdata: "/var/lib/postgresql/data"
 
-pgbouncer_auth_db: "pgbouncer_auth_db"
-pgbouncer_auth_type: scram-sha-256
-pgbouncer_pool_mode: transaction
-pgbouncer_server_cert_file: ""
-pgbouncer_server_key_file: ""
-pgbouncer_ca_file: ""
-pgbouncer_client_key_file: ""
-pgbouncer_client_cert_file: ""
+# Stop and disable the `pgbouncer.service` shipped by the distribution package,
+# so it does not compete with the `pgbouncer@<instance>` units for ports.
+pgbouncer_disable_default_service: true
 
-pgbouncer_pgport: 5432
-pgbouncer_max_client_conn: 100
-pgbouncer_default_pool_size: 20
-pgbouncer_min_pool_size: 0
+# One pgbouncer process is deployed per entry, as systemd unit `pgbouncer@<name>`
+# with config file /etc/pgbouncer/pgbouncer-<name>.ini.
+# Every entry is combined with pgbouncer_instance_defaults, so only the values
+# that differ need to be set. Each instance needs a unique `port`.
+# Point `pgdata` / `pgport` / `pghost` to the PostgreSQL cluster to pool.
+#
+# Example for two PostgreSQL clusters:
+# pgbouncer_instances:
+#   pg15:
+#     pgdata: /var/lib/pgsql/15/data
+#     pgport: 5432
+#     port: 6432
+#   pg16:
+#     pgdata: /var/lib/pgsql/16/data
+#     pgport: 5433
+#     port: 6433
+pgbouncer_instances:
+  main: {}
+
+pgbouncer_instance_defaults:
+  manage_hba: true
+  manage_ident: true
+  auth_user: "pgbouncer_auth_user"
+  auth_db: "pgbouncer_auth_db"
+  auth_type: scram-sha-256
+  pool_mode: transaction
+  # PostgreSQL cluster that this instance pools
+  pgdata: "/var/lib/postgresql/data"
+  pghost: "/tmp"
+  pgport: 5432
+  # pgenv settings are used to connect to postgres and create the auth db / user / lookup function
+  pgenv:
+    service: master
+  # pgbouncer listener
+  listen_addr: "*"
+  port: 6432
+  server_cert_file: ""
+  server_key_file: ""
+  ca_file: ""
+  client_key_file: ""
+  client_cert_file: ""
+  max_client_conn: 100
+  default_pool_size: 20
+  min_pool_size: 0

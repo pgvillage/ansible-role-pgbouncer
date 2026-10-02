@@ -31,6 +31,33 @@ Including an example of how to use your role (for instance, with variables passe
       roles:
          - pgvillage.pgbouncer
 
+Multiple instances
+------------------
+
+Every entry in `pgbouncer_instances` becomes a separate pgbouncer process (systemd unit `pgbouncer@<name>`,
+config `/etc/pgbouncer/pgbouncer-<name>.ini`). Values not set on an instance are taken from
+`pgbouncer_instance_defaults`. Each instance needs a unique `port`.
+This allows pooling multiple PostgreSQL clusters, or one cluster with different pool settings:
+
+    - hosts: servers
+      vars:
+        pgbouncer_instances:
+          pg15:
+            pgdata: /var/lib/pgsql/15/data
+            pgport: 5432
+            port: 6432
+          pg16:
+            pgdata: /var/lib/pgsql/16/data
+            pgport: 5433
+            port: 6433
+          pg16_session:
+            pgdata: /var/lib/pgsql/16/data
+            pgport: 5433
+            port: 6434
+            pool_mode: session
+      roles:
+         - pgvillage.pgbouncer
+
 License
 -------
 

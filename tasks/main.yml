@@ -3,11 +3,55 @@
 - name: Assertions
   ansible.builtin.assert:
     that:
-      - "pgbouncer_auth_db != 'pgbouncer'"
+      - "pgbouncer_instances | length > 0"
+      - "pgbouncer_instances.keys() | reject('match', '^[A-Za-z0-9_-]+$') | list | length == 0"
+      - "_pgbouncer_ports | unique | length == _pgbouncer_ports | length"
+    fail_msg: >-
+      pgbouncer_instances must be non-empty, instance names may only contain [A-Za-z0-9_-]
+      and every instance needs a unique port (got {{ _pgbouncer_ports }})
+  vars:
+    _pgbouncer_ports: "{{ pgbouncer_instances.values() | map(attribute='port', default=pgbouncer_instance_defaults.port) | list }}"
 
 - name: Install
-  ansible.legacy.include_tasks: install.yml
-- name: Configure
-  ansible.legacy.include_tasks: config.yml
-- name: Start
-  ansible.legacy.include_tasks: start.yml
+  ansible.builtin.include_tasks: install.yml
+
+- name: Configure (per instance)
+  ansible.builtin.include_tasks: configure.yml
+  loop: "{{ pgbouncer_instances | dict2items }}"
+  loop_control:
+    loop_var: pgbouncer_instance_item
+    label: "{{ pgbouncer_instance_item.key }}"
+  vars:
+    pgbouncer_instance_name: "{{ pgbouncer_instance_item.key }}"
+    pgbouncer_instance: "{{ pgbouncer_instance_defaults | combine(pgbouncer_instance_item.value | default({}, true), recursive=True) }}"
+
+- name: Create service file
+  ansible.builtin.template:
+    dest: /etc/systemd/system/pgbouncer@.service
+    src: pgbouncer@.service.j2
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Restart pgbouncer instances
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+  when: pgbouncer_disable_default_service
+
+- name: Disable default (single instance) pgbouncer service
+  ansible.builtin.systemd_service:
+    name: pgbouncer
+    enabled: false
+    state: stopped
+  when:
+    - pgbouncer_disable_default_service
+    - "'pgbouncer.service' in ansible_facts.services"
+
+- name: Start pgbouncer instances
+  ansible.builtin.systemd_service:
+    name: "pgbouncer@{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ pgbouncer_instances.keys() | list }}"

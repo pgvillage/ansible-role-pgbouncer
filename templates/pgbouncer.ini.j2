@@ -1,15 +1,15 @@
 [databases]
-* = host=/tmp port={{ pgbouncer_pgport }}
+* = host={{ pgbouncer_instance.pghost }} port={{ pgbouncer_instance.pgport }}
 
 [users]
 
 [pgbouncer]
 
-logfile = /var/log/pgbouncer/pgbouncer.log
-pidfile = /var/run/pgbouncer/pgbouncer.pid
+logfile = /var/log/pgbouncer/pgbouncer-{{ pgbouncer_instance_name }}.log
+pidfile = /var/run/pgbouncer/pgbouncer-{{ pgbouncer_instance_name }}.pid
 
-listen_addr = *
-listen_port = 6432
+listen_addr = {{ pgbouncer_instance.listen_addr }}
+listen_port = {{ pgbouncer_instance.port }}
 
 ;; Unix socket is also used for -R.
 unix_socket_dir = /tmp
@@ -25,9 +25,9 @@ unix_socket_group =
 
 ;; Private key and cert to present to clients.
 ;; Required for accepting TLS connections from clients.
-{% if pgbouncer_server_cert_file != "" %}
-client_tls_key_file = {{ pgbouncer_key_file }}
-client_tls_cert_file = {{ pgbouncer_server_cert_file }}
+{% if pgbouncer_instance.server_cert_file != "" %}
+client_tls_key_file = {{ pgbouncer_instance.server_key_file }}
+client_tls_cert_file = {{ pgbouncer_instance.server_cert_file }}
 {% else %}
 ;client_tls_key_file = 
 ;client_tls_cert_file = 
@@ -53,17 +53,17 @@ client_tls_cert_file = {{ pgbouncer_server_cert_file }}
 server_tls_sslmode = require
 
 ;; Path to that contains trusted CA certs
-{% if pgbouncer_ca_file != "" %}
-server_tls_ca_file = {{ pgbouncer_ca_file }}
+{% if pgbouncer_instance.ca_file != "" %}
+server_tls_ca_file = {{ pgbouncer_instance.ca_file }}
 {% else %}
 ;server_tls_ca_file = 
 {% endif %}
 
 ;; Private key and cert to present to backend.
 ;; Needed only if backend server require client cert.
-{% if pgbouncer_client_cert_file != "" %}
-server_tls_key_file = {{ pgbouncer_client_key_file }}
-server_tls_cert_file = {{ pgbouncer_client_cert_file }}
+{% if pgbouncer_instance.client_cert_file != "" %}
+server_tls_key_file = {{ pgbouncer_instance.client_key_file }}
+server_tls_cert_file = {{ pgbouncer_instance.client_cert_file }}
 {% else %}
 ;server_tls_key_file =
 ;server_tls_cert_file =
@@ -81,10 +81,10 @@ server_tls_cert_file = {{ pgbouncer_client_cert_file }}
 ;;; auth_user moet ingesteld staan op pgbouncer
 ;;; - andere auth_user verstoort peer auth voor pgbouncer password lookup
 ;;; - emptystring schakelt password lookup uit voor users die niet in authfile staan
-auth_user = {{ pgbouncer_auth_user }}
-auth_type = {{ pgbouncer_auth_type }}
+auth_user = {{ pgbouncer_instance.auth_user }}
+auth_type = {{ pgbouncer_instance.auth_type }}
 auth_query = SELECT p_user, p_password FROM public.lookup($1)
-auth_dbname = {{ pgbouncer_auth_db }}
+auth_dbname = {{ pgbouncer_instance.auth_db }}
 
 ;; any, trust, plain, md5, cert, hba, pam
 ;auth_type = 
@@ -122,7 +122,7 @@ stats_users = stats, postgres
 ;;   session      - after client disconnects (default)
 ;;   transaction  - after transaction finishes
 ;;   statement    - after statement finishes
-pool_mode = {{ pgbouncer_pool_mode }}
+pool_mode = {{ pgbouncer_instance.pool_mode }}
 
 ;; Number of prepared statements to cache on a server connection (zero value
 ;; disables support of prepared statements).
@@ -168,15 +168,15 @@ ignore_startup_parameters = extra_float_digits
 ;;;
 
 ;; Total number of clients that can connect
-max_client_conn = {{ pgbouncer_max_client_conn }}
+max_client_conn = {{ pgbouncer_instance.max_client_conn }}
 
 ;; Default pool size.  20 is good number when transaction pooling
 ;; is in use, in session pooling it needs to be the number of
 ;; max clients you want to handle at any moment
-default_pool_size = {{ pgbouncer_default_pool_size }}
+default_pool_size = {{ pgbouncer_instance.default_pool_size }}
 
 ;; Minimum number of server connections to keep in pool.
-min_pool_size =  {{ pgbouncer_min_pool_size }}
+min_pool_size =  {{ pgbouncer_instance.min_pool_size }}
 
 ; how many additional connection to allow in case of trouble
 ;reserve_pool_size = 0
