@@ -1,63 +1,71 @@
 ---
+# Included from main.yml once per instance, with:
+#   pgbouncer_instance_name: name of the instance (key in pgbouncer_instances)
+#   pgbouncer_instance:      pgbouncer_instance_defaults combined with the instance values
 
-vars:
-  instance_name: "{{ instance.name }}"
-  instance_values: "{{ pgbouncer_instance_defaults | combine(instance.value, recursive=True) }}"
+- name: "Assertions for instance {{ pgbouncer_instance_name }}"
+  ansible.builtin.assert:
+    that:
+      - "pgbouncer_instance.auth_db != 'pgbouncer'"
 
-- name: Create configfile
+- name: "Create configfile for instance {{ pgbouncer_instance_name }}"
   ansible.builtin.template:
-    dest: "/etc/pgbouncer/pgbouncer-{{ instance.name }}.ini"
+    dest: "/etc/pgbouncer/pgbouncer-{{ pgbouncer_instance_name }}.ini"
     src: pgbouncer.ini.j2
     owner: "{{ pgbouncer_os_user }}"
     group: "{{ pgbouncer_os_group }}"
-    mode: "0666"
+    mode: "0640"
+  notify:
+    - Reload pgbouncer instances
 
-- name: Copy script create_function_lookup.sql
+- name: "Copy script create_function_lookup.sql for instance {{ pgbouncer_instance_name }}"
   ansible.builtin.template:
     src: create_function_lookup.sql.j2
-    dest: /tmp/create_function_lookup.sql
+    dest: "/tmp/create_function_lookup-{{ pgbouncer_instance_name }}.sql"
     owner: postgres
     group: postgres
     mode: '0644'
 
-- name: Create DB objects
+- name: "Create DB objects for instance {{ pgbouncer_instance_name }}"
   become: true
   become_user: postgres
   environment:
-    PGSERVICE: master
+    PGSERVICE: "{{ pgbouncer_instance.pgservice }}"
   run_once: true
   block:
     - name: Create auth DB
       community.postgresql.postgresql_db:
-        name: "{{ instance_values.auth_db }}"
+        name: "{{ pgbouncer_instance.auth_db }}"
+        login_port: "{{ pgbouncer_instance.pgport }}"
 
     - name: Create auth user
       community.postgresql.postgresql_user:
-        name: "{{ instance_values.auth_user }}"
+        name: "{{ pgbouncer_instance.auth_user }}"
         role_attr_flags: LOGIN
+        login_port: "{{ pgbouncer_instance.pgport }}"
 
     - name: Run script
       community.postgresql.postgresql_script:
-        login_db: "{{ instance_values.auth_db }}"
-        path: /tmp/create_function_lookup.sql
+        login_db: "{{ pgbouncer_instance.auth_db }}"
+        login_port: "{{ pgbouncer_instance.pgport }}"
+        path: "/tmp/create_function_lookup-{{ pgbouncer_instance_name }}.sql"
 
-- name: Manage HBA
-  when: pgbouncer_manage_hba
-
+- name: "Manage HBA for instance {{ pgbouncer_instance_name }}"
+  when: pgbouncer_instance.manage_hba
   block:
     - name: Update pg_hba.conf add pgbouncer
       community.postgresql.postgresql_pg_hba:
-        dest: "{{ instance_values.pgdata }}/pg_hba.conf"
+        dest: "{{ pgbouncer_instance.pgdata }}/pg_hba.conf"
         contype: local
-        databases: "{{ instance_values.auth_db }}"
-        users: "{{ instance_values.auth_user }}"
+        databases: "{{ pgbouncer_instance.auth_db }}"
+        users: "{{ pgbouncer_instance.auth_user }}"
         method: peer
         options: map=pgbouncer
       notify:
         - Reload postgres
     - name: Update pg_hba.conf to scram-sha-256
       community.postgresql.postgresql_pg_hba:
-        dest: "{{ instance_values.pgdata }}/pg_hba.conf"
+        dest: "{{ pgbouncer_instance.pgdata }}/pg_hba.conf"
         contype: local
         databases: all
         users: all
@@ -65,12 +73,12 @@ vars:
       notify:
         - Reload postgres
 
-- name: "Add ident line for pgbouncer to login without password as {{ instance_values.auth_user }}"
+- name: "Add ident line for pgbouncer to login without password as {{ pgbouncer_instance.auth_user }}"
   ansible.builtin.lineinfile:
-    path: "{{ instance_values.pgdata }}/pg_ident.conf"
-    line: "pgbouncer {{ instance_values.os_user }} {{ instance.auth_user }}"
+    path: "{{ pgbouncer_instance.pgdata }}/pg_ident.conf"
+    line: "pgbouncer {{ pgbouncer_os_user }} {{ pgbouncer_instance.auth_user }}"
     owner: postgres
     group: postgres
     mode: '0644'
-  when: instance_values.manage_ident
+  when: pgbouncer_instance.manage_ident
   notify: Reload postgres
