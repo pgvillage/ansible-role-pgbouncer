@@ -2,8 +2,13 @@
 
 # default values for PgBouncer
 
+# Directory containing the pgbouncer binary, used in ExecStart of the
+# `pgbouncer@.service` systemd unit.
 pgbouncer_install_dir: /usr/bin
 
+# OS user and group that run pgbouncer and own its config, log and run files.
+# Both are created as system accounts if they do not exist.
+# The user is also mapped to the auth_user in pg_ident.conf (see manage_ident).
 pgbouncer_os_user: "pgbouncer"
 pgbouncer_os_group: "pgbouncer"
 
@@ -15,6 +20,7 @@ pgbouncer_disable_default_service: true
 # with config file /etc/pgbouncer/pgbouncer-<name>.ini.
 # Every entry is combined with pgbouncer_instance_defaults, so only the values
 # that differ need to be set. Each instance needs a unique `port`.
+# Instance names may only contain [A-Za-z0-9_-].
 # Point `pgdata` / `pgport` / `pghost` to the PostgreSQL cluster to pool.
 #
 # Example for two PostgreSQL clusters:
@@ -30,28 +36,53 @@ pgbouncer_disable_default_service: true
 pgbouncer_instances:
   main: {}
 
+# Default settings for every instance in pgbouncer_instances (recursively merged).
 pgbouncer_instance_defaults:
+  # Add pg_hba.conf entries: peer auth (map=pgbouncer) for auth_user on auth_db,
+  # and scram-sha-256 for all other local connections.
   manage_hba: true
+  # Add a `pgbouncer <pgbouncer_os_user> <auth_user>` mapping to pg_ident.conf,
+  # so pgbouncer can log in as auth_user without a password.
   manage_ident: true
+  # PostgreSQL user that pgbouncer uses to look up passwords (auth_user in pgbouncer.ini).
+  # It is created and granted EXECUTE on the public.lookup() function.
   auth_user: "pgbouncer_auth_user"
+  # Database in which the lookup function is created (auth_dbname in pgbouncer.ini).
+  # Must not be `pgbouncer`, as that name is reserved for the pgbouncer admin console.
   auth_db: "pgbouncer_auth_db"
+  # How pgbouncer authenticates clients (any, trust, plain, md5, scram-sha-256, cert, hba, pam).
   auth_type: scram-sha-256
+  # When a server connection is released back to the pool (session, transaction, statement).
   pool_mode: transaction
   # PostgreSQL cluster that this instance pools
+  # Data directory, used to locate pg_hba.conf and pg_ident.conf.
   pgdata: "/var/lib/postgresql/data"
+  # Host or unix socket directory pgbouncer connects to.
   pghost: "/tmp"
+  # Port of the PostgreSQL cluster, used by pgbouncer and to create the auth db / user.
   pgport: 5432
   # pgenv settings are used to connect to postgres and create the auth db / user / lookup function
+  # Every key becomes a libpq environment variable, e.g. `service` -> PGSERVICE, `host` -> PGHOST.
   pgenv:
     service: master
   # pgbouncer listener
+  # Address(es) to listen on for TCP connections, `*` for all.
   listen_addr: "*"
+  # Port to listen on, must be unique per instance.
   port: 6432
+  # TLS certificate and key that pgbouncer presents to clients (client_tls_*_file).
+  # Client TLS is only enabled when server_cert_file is set.
   server_cert_file: ""
   server_key_file: ""
+  # CA file used to verify the PostgreSQL server certificate (server_tls_ca_file).
   ca_file: ""
+  # TLS certificate and key that pgbouncer presents to PostgreSQL (server_tls_*_file).
+  # Only needed when PostgreSQL requires client certificates; enabled when client_cert_file is set.
   client_key_file: ""
   client_cert_file: ""
+  # Maximum number of client connections allowed.
   max_client_conn: 100
+  # Number of server connections per user/database pair.
   default_pool_size: 20
+  # Minimum number of server connections to keep in the pool.
   min_pool_size: 0

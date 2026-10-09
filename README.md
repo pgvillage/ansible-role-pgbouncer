@@ -13,7 +13,8 @@ None
 Role Variables
 --------------
 
-Please see [defaults](https://github.com/pgvillage/ansible-role-pgbouncer/blob/main/defaults/main.yml) for all variables
+Please see the [API docs](docs/api.md) for a description of all variables,
+and [defaults](defaults/main.yml) for their default values.
 
 
 Dependencies
