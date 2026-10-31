@@ -1,0 +1,70 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Read the service states
+      ansible.builtin.service_facts:
+
+    - name: Check that the instance runs, and the default pgbouncer service does not
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['pgbouncer@main.service'].state == 'running'
+          - ansible_facts.services['pgbouncer.service'].state != 'running'
+
+    # service_facts does not report the enabled state of template instances
+    - name: Check that the instance is enabled
+      ansible.builtin.systemd:
+        name: pgbouncer@main.service
+        enabled: true
+      check_mode: true
+      register: enabled
+      failed_when: enabled is changed
+
+    # PgBouncer looks up the password of app with public.lookup(), as
+    # pgbouncer_auth_user (peer auth with the pgbouncer ident map), and then
+    # connects to PostgreSQL as app (over the unix socket: no server port)
+    - name: Log in as app through PgBouncer, with scram-sha-256
+      ansible.builtin.command: >-
+        psql "host=127.0.0.1 port=6432 dbname=postgres user=app"
+        -AtF ' ' -c "select current_user, inet_server_port() is null"
+      environment:
+        PGPASSWORD: app-secret
+      register: login
+      changed_when: false
+      failed_when: login.rc != 0 or login.stdout != 'app t'
+
+    - name: Check that a wrong password is refused
+      ansible.builtin.command: psql "host=127.0.0.1 port=6432 dbname=postgres user=app" -c "select 1"
+      environment:
+        PGPASSWORD: wrong
+      register: wrong_login
+      changed_when: false
+      failed_when: wrong_login.rc == 0 or 'password authentication failed' not in wrong_login.stderr
+
+    - name: Show the pools on the admin console, as postgres
+      become: true
+      become_user: postgres
+      ansible.builtin.command: psql "host=/tmp port=6432 dbname=pgbouncer" -Atc "show pools"
+      register: pools
+      changed_when: false
+
+    - name: Check that PgBouncer pools postgres for app
+      ansible.builtin.assert:
+        that: pools.stdout_lines | select('match', '^postgres\|app\|') | list | length == 1
+        fail_msg: "{{ pools.stdout }}"
+
+    - name: Read pg_hba.conf and pg_ident.conf
+      ansible.builtin.slurp:
+        src: "/var/lib/pgsql/data/{{ item }}"
+      loop: [pg_hba.conf, pg_ident.conf]
+      register: pg_conf
+
+    - name: Check the hba and ident entries for the auth user
+      ansible.builtin.assert:
+        that:
+          - hba is search('local\s+pgbouncer_auth_db\s+pgbouncer_auth_user\s+peer\s+map=pgbouncer')
+          - hba is search('local\s+all\s+all\s+scram-sha-256')
+          - "'pgbouncer pgbouncer pgbouncer_auth_user' in ident"
+      vars:
+        hba: "{{ pg_conf.results[0].content | b64decode }}"
+        ident: "{{ pg_conf.results[1].content | b64decode }}"
