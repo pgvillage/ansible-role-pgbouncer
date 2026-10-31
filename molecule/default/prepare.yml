@@ -1,0 +1,72 @@
+---
+# PgBouncer pools a PostgreSQL server, and the role creates its auth user, db
+# and lookup function in it through the libpq service "master". The smallest
+# real setup is the PostgreSQL server from the distribution, with a
+# pg_service.conf for the postgres user. The role switches local connections
+# to scram-sha-256, so the postgres user connects over TCP on localhost (trust).
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install the PostgreSQL server and psycopg2 (for community.postgresql)
+      ansible.builtin.dnf:
+        name:
+          - postgresql-server
+          - python3-psycopg2
+        state: present
+
+    - name: Initialize the PostgreSQL data directory
+      ansible.builtin.command: postgresql-setup --initdb
+      args:
+        creates: /var/lib/pgsql/data/PG_VERSION
+
+    - name: Let postgres connect over TCP on localhost without a password
+      ansible.builtin.copy:
+        dest: /var/lib/pgsql/data/pg_hba.conf
+        content: |
+          local all all peer
+          host all postgres 127.0.0.1/32 trust
+        owner: postgres
+        group: postgres
+        mode: "0600"
+
+    # The default of PostgreSQL 13 (EL9) is md5, which scram-sha-256 auth can't use
+    - name: Store passwords as scram-sha-256
+      ansible.builtin.lineinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        line: password_encryption = 'scram-sha-256'
+
+    - name: Start PostgreSQL
+      ansible.builtin.systemd:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Define the libpq service master for the postgres user
+      ansible.builtin.copy:
+        dest: /var/lib/pgsql/.pg_service.conf
+        content: |
+          [master]
+          host=127.0.0.1
+          port=5432
+          dbname=postgres
+          user=postgres
+        owner: postgres
+        group: postgres
+        mode: "0600"
+
+    - name: Create a user with a password, to log in through PgBouncer
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: app
+        password: app-secret
+        login_host: 127.0.0.1
+
+    # PgBouncer's admin console (admin_users = postgres) also uses scram-sha-256
+    - name: Give postgres a password, to log in to the PgBouncer admin console
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: postgres
+        password: postgres-secret
+        login_host: 127.0.0.1
