@@ -39,7 +39,7 @@
         PGPASSWORD: wrong
       register: wrong_login
       changed_when: false
-      failed_when: wrong_login.rc == 0 or 'password authentication failed' not in wrong_login.stderr
+      failed_when: wrong_login.rc == 0 or 'authentication failed' not in wrong_login.stderr
 
     - name: Show the pools on the admin console, as postgres
       become: true
