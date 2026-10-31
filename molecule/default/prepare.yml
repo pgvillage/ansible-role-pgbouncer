@@ -61,3 +61,12 @@
         name: app
         password: app-secret
         login_host: 127.0.0.1
+
+    # PgBouncer's admin console (admin_users = postgres) also uses scram-sha-256
+    - name: Give postgres a password, to log in to the PgBouncer admin console
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: postgres
+        password: postgres-secret
+        login_host: 127.0.0.1

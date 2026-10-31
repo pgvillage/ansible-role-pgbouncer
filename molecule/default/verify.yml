@@ -45,6 +45,8 @@
       become: true
       become_user: postgres
       ansible.builtin.command: psql "host=/tmp port=6432 dbname=pgbouncer" -Atc "show pools"
+      environment:
+        PGPASSWORD: postgres-secret
       register: pools
       changed_when: false
 
