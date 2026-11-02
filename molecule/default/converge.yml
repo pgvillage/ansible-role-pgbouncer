@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: all
+  # The role creates the auth db and user with run_once, as all hosts of a
+  # cluster share one database. Here each host has its own PostgreSQL server,
+  # so converge the hosts one at a time.
+  serial: 1
+  vars:
+    pgbouncer_instances:
+      main:
+        pgdata: /var/lib/pgsql/data
+        pgport: 5432
+        port: 6432
+  roles:
+    - role: pgvillage.pgbouncer

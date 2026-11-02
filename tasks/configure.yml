@@ -49,6 +49,8 @@
         login_db: "{{ pgbouncer_instance.auth_db }}"
         login_port: "{{ pgbouncer_instance.pgport }}"
         path: "/tmp/create_function_lookup-{{ pgbouncer_instance_name }}.sql"
+      # The script only creates or replaces the function and sets its grants
+      changed_when: false
 
 - name: "Manage HBA for instance {{ pgbouncer_instance_name }}"
   when: pgbouncer_instance.manage_hba

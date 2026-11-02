@@ -23,6 +23,9 @@
     group: "{{ pgbouncer_os_group }}"
     state: "{{ item.state }}"
     mode: "{{ item.mode }}"
+    # Don't update the timestamps of the touched log file on every run
+    modification_time: preserve
+    access_time: preserve
   loop:
     - dest: /var/log/pgbouncer
       state: directory

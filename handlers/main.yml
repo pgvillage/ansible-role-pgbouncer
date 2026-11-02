@@ -7,7 +7,8 @@
   loop: "{{ pgbouncer_instances.keys() | list }}"
 
 - name: Reload postgres
-  ansible.builtin.command: pkill -HUP postgres
+  # The postmaster is named postmaster when started through that name (as on EL)
+  ansible.builtin.command: pkill -HUP -x 'postgres|postmaster'
   register: handle_reload
   changed_when: handle_reload.rc != 0
 
