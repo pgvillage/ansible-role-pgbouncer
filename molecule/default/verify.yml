@@ -71,8 +71,8 @@
         hba: "{{ pg_conf.results[0].content | b64decode }}"
         ident: "{{ pg_conf.results[1].content | b64decode }}"
 
-# Simulate a package upgrade outside the role: replace the binary, so the
-# running instance shows its executable as deleted. Running the role again
+# Simulate a package upgrade outside the role: replace the binary (new ctime)
+# after the instance started. Running the role again
 # must then restart the instance (rolling over both hosts), and only then.
 - name: Verify the restart after an upgraded binary
   hosts: all
@@ -87,6 +87,10 @@
       ansible.builtin.systemd_service:
         name: pgbouncer@main
       register: before
+
+    - name: Wait a second, as the start time and ctime have a resolution of 1s
+      ansible.builtin.pause:
+        seconds: 2
 
     - name: Replace the pgbouncer binary, as a package upgrade does
       ansible.builtin.shell: cp -p /usr/bin/pgbouncer /usr/bin/pgbouncer.new && mv /usr/bin/pgbouncer.new /usr/bin/pgbouncer
@@ -104,17 +108,10 @@
         name: pgbouncer@main
       register: after
 
-    - name: Read the executable of the restarted instance
-      ansible.builtin.command: readlink /proc/{{ after.status.MainPID }}/exe
-      register: after_exe
-      changed_when: false
-
-    - name: Check that the instance was restarted, on the new binary
+    - name: Check that the instance was restarted
       ansible.builtin.assert:
-        that:
-          - after.status.MainPID != before.status.MainPID
-          - after_exe.stdout == '/usr/bin/pgbouncer'
-        fail_msg: "PID before: {{ before.status.MainPID }}, after: {{ after.status.MainPID }} ({{ after_exe.stdout }})"
+        that: after.status.MainPID != before.status.MainPID
+        fail_msg: "PID before: {{ before.status.MainPID }}, after: {{ after.status.MainPID }}"
 
     - name: Log in as app through the restarted PgBouncer
       ansible.builtin.command: psql "host=127.0.0.1 port=6432 dbname=postgres user=app" -Atc "select 1"

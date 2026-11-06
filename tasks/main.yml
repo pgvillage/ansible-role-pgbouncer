@@ -58,14 +58,23 @@
 
 # The package is usually upgraded outside this role (e.g. by the linux role or
 # unattended-upgrades), and needrestart skips pgbouncer@*. An instance still
-# runs the old binary when its executable shows as deleted: restart it then.
-- name: Find pgbouncer instances that run an upgraded (deleted) binary
+# runs the old binary when the binary was replaced (its ctime) after the
+# instance started: restart it then. (Reading /proc/<pid>/exe would need
+# CAP_SYS_PTRACE, which containers lack.)
+- name: Find pgbouncer instances that started before their binary was replaced
   ansible.builtin.shell: |
     set -e
-    pid=$(systemctl show --property MainPID --value 'pgbouncer@{{ item }}')
-    if [ "${pid:-0}" -gt 0 ]; then readlink "/proc/${pid}/exe"; fi
+    unit='pgbouncer@{{ item }}'
+    # Start time in microseconds of CLOCK_MONOTONIC (time since boot), 0 if not running
+    started=$(systemctl show --property ExecMainStartTimestampMonotonic --value "$unit")
+    if [ "$(systemctl show --property MainPID --value "$unit")" -gt 0 ] && [ "${started:-0}" -gt 0 ]; then
+      uptime=$(cut -d. -f1 /proc/uptime)
+      started_at=$(( $(date +%s) - uptime + started / 1000000 ))
+      replaced_at=$(stat -c %Z '{{ pgbouncer_install_dir }}/pgbouncer')
+      if [ "$replaced_at" -gt "$started_at" ]; then echo replaced; fi
+    fi
   loop: "{{ pgbouncer_instances.keys() | list }}"
-  register: pgbouncer_running_binary
-  changed_when: pgbouncer_running_binary.stdout is search(' \(deleted\)$')
+  register: pgbouncer_binary_check
+  changed_when: pgbouncer_binary_check.stdout == 'replaced'
   notify:
     - Restart pgbouncer instances

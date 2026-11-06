@@ -50,8 +50,8 @@ Configuration changes only reload the instances (`SIGHUP`), which keeps client c
 The instances are restarted when:
 
 - the role installed the pgbouncer package,
-- an instance still runs a binary that was replaced since it started (its executable shows as
-  deleted), e.g. after the package was upgraded by the linux role or unattended-upgrades, or
+- the pgbouncer binary was replaced after an instance started (so the instance still runs the old
+  binary), e.g. when the package was upgraded by the linux role or unattended-upgrades, or
 - the `pgbouncer@.service` unit changed.
 
 Restarts are rolling, so clients can always use the instances
