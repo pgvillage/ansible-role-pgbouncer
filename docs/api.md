@@ -47,8 +47,14 @@ pgbouncer_instances:
 ## Restarts
 
 Configuration changes only reload the instances (`SIGHUP`), which keeps client connections.
-The instances are restarted when the pgbouncer package was installed or upgraded, or when the
-`pgbouncer@.service` unit changed. Restarts are rolling, so clients can always use the instances
+The instances are restarted when:
+
+- the role installed the pgbouncer package,
+- an instance still runs a binary that was replaced since it started (its executable shows as
+  deleted), e.g. after the package was upgraded by the linux role or unattended-upgrades, or
+- the `pgbouncer@.service` unit changed.
+
+Restarts are rolling, so clients can always use the instances
 on the other hosts:
 
 - one host at a time (also when the play runs on all hosts at once), and

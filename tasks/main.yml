@@ -55,3 +55,17 @@
     state: started
     daemon_reload: true
   loop: "{{ pgbouncer_instances.keys() | list }}"
+
+# The package is usually upgraded outside this role (e.g. by the linux role or
+# unattended-upgrades), and needrestart skips pgbouncer@*. An instance still
+# runs the old binary when its executable shows as deleted: restart it then.
+- name: Find pgbouncer instances that run an upgraded (deleted) binary
+  ansible.builtin.shell: |
+    set -e
+    pid=$(systemctl show --property MainPID --value 'pgbouncer@{{ item }}')
+    if [ "${pid:-0}" -gt 0 ]; then readlink "/proc/${pid}/exe"; fi
+  loop: "{{ pgbouncer_instances.keys() | list }}"
+  register: pgbouncer_running_binary
+  changed_when: pgbouncer_running_binary.stdout is search(' \(deleted\)$')
+  notify:
+    - Restart pgbouncer instances
