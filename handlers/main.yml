@@ -12,10 +12,24 @@
   register: handle_reload
   changed_when: handle_reload.rc != 0
 
+# Restarts are rolling: one host at a time, and on that host one instance at a
+# time, waiting until the instance accepts connections again before going on.
+# A handler runs on all notified hosts at once, so the notified hosts first
+# store what to restart in a fact (play vars and role defaults are not in
+# hostvars), and then one run (run_once) restarts the stored instances host by
+# host (delegate_to), see tasks/restart_host.yml.
 - name: Restart pgbouncer instances
-  ansible.builtin.systemd_service:
-    name: "pgbouncer@{{ item }}"
-    enabled: true
-    state: restarted
-    daemon_reload: true
-  loop: "{{ pgbouncer_instances.keys() | list }}"
+  ansible.builtin.set_fact:
+    _pgbouncer_restart:
+      instances: "{{ pgbouncer_instances }}"
+      instance_defaults: "{{ pgbouncer_instance_defaults }}"
+      wait_timeout: "{{ pgbouncer_restart_wait_timeout }}"
+
+- name: Restart pgbouncer instances on one host at a time
+  ansible.builtin.include_tasks: restart_host.yml
+  run_once: true
+  loop: "{{ ansible_play_batch }}"
+  loop_control:
+    loop_var: pgbouncer_restart_host
+  when: hostvars[pgbouncer_restart_host]._pgbouncer_restart | default({}) | length > 0
+  listen: Restart pgbouncer instances

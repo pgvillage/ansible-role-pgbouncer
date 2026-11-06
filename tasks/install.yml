@@ -11,10 +11,14 @@
     group: "{{ pgbouncer_os_group }}"
     system: "true"
 
+# Running instances keep the old binary until they are restarted. The restart
+# is rolling (see handlers/main.yml), so needrestart should skip pgbouncer@*.
 - name: Install pgbouncer
   ansible.builtin.package:
     name: pgbouncer
     state: present
+  notify:
+    - Restart pgbouncer instances
 
 - name: Create pgbouncer configuration files
   ansible.builtin.file:
