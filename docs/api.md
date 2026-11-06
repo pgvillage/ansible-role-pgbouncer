@@ -11,6 +11,7 @@ Defaults are defined in [defaults/main.yml](../defaults/main.yml).
 | `pgbouncer_os_user` | `pgbouncer` | OS user that runs pgbouncer and owns its config, log and run files. Created as a system account. Also mapped to `auth_user` in `pg_ident.conf` (see `manage_ident`). |
 | `pgbouncer_os_group` | `pgbouncer` | OS group for `pgbouncer_os_user`. Created as a system group. |
 | `pgbouncer_disable_default_service` | `true` | Stop and disable the `pgbouncer.service` shipped by the distribution package, so it does not compete with the `pgbouncer@<instance>` units for ports. |
+| `pgbouncer_restart_wait_timeout` | `60` | Seconds to wait, after restarting an instance, until it accepts connections on its `port` again, before restarting the next one. See [Restarts](#restarts). |
 | `pgbouncer_instances` | `{main: {}}` | Dictionary of pgbouncer instances to deploy. See [Instances](#instances). |
 | `pgbouncer_instance_defaults` | see below | Default settings merged (recursively) into every instance. See [Instance settings](#instance-settings). |
 
@@ -42,6 +43,19 @@ pgbouncer_instances:
     pgport: 5433
     port: 6433
 ```
+
+## Restarts
+
+Configuration changes only reload the instances (`SIGHUP`), which keeps client connections.
+The instances are restarted when the pgbouncer package was installed or upgraded, or when the
+`pgbouncer@.service` unit changed. Restarts are rolling, so clients can always use the instances
+on the other hosts:
+
+- one host at a time (also when the play runs on all hosts at once), and
+- on a host one instance at a time, waiting until the instance accepts connections on its `port`
+  (up to `pgbouncer_restart_wait_timeout` seconds) before restarting the next one.
+
+As the role restarts the instances itself, exclude `pgbouncer@*.service` from needrestart on Ubuntu.
 
 ## Instance settings
 

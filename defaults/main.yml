@@ -16,6 +16,12 @@ pgbouncer_os_group: "pgbouncer"
 # so it does not compete with the `pgbouncer@<instance>` units for ports.
 pgbouncer_disable_default_service: true
 
+# Restarts (after a package upgrade or a change of the systemd unit) are rolling:
+# one host at a time, and one instance at a time. After restarting an instance,
+# wait up to this many seconds until it accepts connections on its port, before
+# restarting the next one. Config changes only reload the instances.
+pgbouncer_restart_wait_timeout: 60
+
 # One pgbouncer process is deployed per entry, as systemd unit `pgbouncer@<name>`
 # with config file /etc/pgbouncer/pgbouncer-<name>.ini.
 # Every entry is combined with pgbouncer_instance_defaults, so only the values

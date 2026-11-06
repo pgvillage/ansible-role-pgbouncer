@@ -1,0 +1,27 @@
+---
+# Included from restart_host.yml once per instance, with:
+#   pgbouncer_restart_host:  host to restart the instance on (delegate_to)
+#   pgbouncer_instance_name: name of the instance (key in pgbouncer_instances)
+#   pgbouncer_instance:      pgbouncer_instance_defaults combined with the instance values
+#   pgbouncer_restart_wait_timeout: of the restarted host
+
+- name: "Restart pgbouncer instance {{ pgbouncer_restart_host ~ '/' ~ pgbouncer_instance_name }}"
+  ansible.builtin.systemd_service:
+    name: "pgbouncer@{{ pgbouncer_instance_name }}"
+    enabled: true
+    state: restarted
+    daemon_reload: true
+  delegate_to: "{{ pgbouncer_restart_host }}"
+  run_once: true
+
+# Connect on the loopback address when the instance listens on all addresses
+- name: "Wait until it accepts connections: {{ pgbouncer_restart_host ~ '/' ~ pgbouncer_instance_name }}"
+  ansible.builtin.wait_for:
+    host: >-
+      {{ {'*': '127.0.0.1', '0.0.0.0': '127.0.0.1', '::': '::1'}.get(_pgbouncer_listen_addr, _pgbouncer_listen_addr) }}
+    port: "{{ pgbouncer_instance.port }}"
+    timeout: "{{ pgbouncer_restart_wait_timeout }}"
+  vars:
+    _pgbouncer_listen_addr: "{{ (pgbouncer_instance.listen_addr | string).split(',') | first | trim }}"
+  delegate_to: "{{ pgbouncer_restart_host }}"
+  run_once: true

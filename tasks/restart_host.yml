@@ -1,0 +1,28 @@
+---
+# Included from the "Restart pgbouncer instances" handler once per host, with:
+#   pgbouncer_restart_host: host to restart the instances on (delegate_to)
+# The handler runs once for all hosts, so the settings of the restarted host
+# are read from its _pgbouncer_restart fact, and every task has run_once (it
+# is not inherited by included tasks).
+
+- name: "Restart the pgbouncer instances one at a time on {{ pgbouncer_restart_host }}"
+  ansible.builtin.include_tasks: restart_instance.yml
+  loop: "{{ _pgbouncer_restart_host.instances | dict2items }}"
+  loop_control:
+    loop_var: pgbouncer_instance_item
+    label: "{{ pgbouncer_instance_item.key }}"
+  run_once: true
+  vars:
+    _pgbouncer_restart_host: "{{ hostvars[pgbouncer_restart_host]._pgbouncer_restart }}"
+    pgbouncer_instance_name: "{{ pgbouncer_instance_item.key }}"
+    pgbouncer_instance: >-
+      {{ _pgbouncer_restart_host.instance_defaults
+         | combine(pgbouncer_instance_item.value | default({}, true), recursive=True) }}
+    pgbouncer_restart_wait_timeout: "{{ _pgbouncer_restart_host.wait_timeout }}"
+
+- name: "Mark the pgbouncer instances as restarted on {{ pgbouncer_restart_host }}"
+  ansible.builtin.set_fact:
+    _pgbouncer_restart: {}
+  delegate_to: "{{ pgbouncer_restart_host }}"
+  run_once: true
+  delegate_facts: true
