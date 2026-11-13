@@ -59,22 +59,25 @@
 # The package is usually upgraded outside this role (e.g. by the linux role or
 # unattended-upgrades), and needrestart skips pgbouncer@*. An instance still
 # runs the old binary when the binary was replaced (its ctime) after the
-# instance started: restart it then. (Reading /proc/<pid>/exe would need
-# CAP_SYS_PTRACE, which containers lack.)
+# instance started: restart it then. Both are in whole seconds, and the start
+# time is read in UTC, so `date` can parse it. (Reading /proc/<pid>/exe would
+# need CAP_SYS_PTRACE, which containers lack. The monotonic start time can't be
+# combined with /proc/uptime: uptime includes time suspended, the monotonic
+# clock doesn't.)
 - name: Find pgbouncer instances that started before their binary was replaced
   ansible.builtin.shell: |
     set -e
     unit='pgbouncer@{{ item }}'
-    # Start time in microseconds of CLOCK_MONOTONIC (time since boot), 0 if not running
-    started=$(systemctl show --property ExecMainStartTimestampMonotonic --value "$unit")
-    if [ "$(systemctl show --property MainPID --value "$unit")" -gt 0 ] && [ "${started:-0}" -gt 0 ]; then
-      uptime=$(cut -d. -f1 /proc/uptime)
-      started_at=$(( $(date +%s) - uptime + started / 1000000 ))
-      replaced_at=$(stat -c %Z '{{ pgbouncer_install_dir }}/pgbouncer')
-      if [ "$replaced_at" -gt "$started_at" ]; then echo replaced; fi
+    if [ "$(systemctl show --property MainPID --value "$unit")" -gt 0 ]; then
+      started=$(TZ=UTC systemctl show --property ExecMainStartTimestamp --value "$unit")
+      if [ -n "$started" ] && [ "$started" != n/a ]; then
+        replaced_at=$(stat -c %Z '{{ pgbouncer_install_dir }}/pgbouncer')
+        if [ "$replaced_at" -gt "$(TZ=UTC date -d "$started" +%s)" ]; then echo replaced; fi
+      fi
     fi
   loop: "{{ pgbouncer_instances.keys() | list }}"
   register: pgbouncer_binary_check
-  changed_when: pgbouncer_binary_check.stdout == 'replaced'
+  check_mode: false
+  changed_when: pgbouncer_binary_check.stdout | default('') == 'replaced'
   notify:
     - Restart pgbouncer instances
